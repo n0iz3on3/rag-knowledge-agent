@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+documents.json
+sources/
+uploads/
+*.pglite
+*.log
+static/PROJECT.pdf
+static/last_slide.html
+static/last_slide.pdf
+static/mdpdf.log

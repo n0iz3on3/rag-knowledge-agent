@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Knowledge Base</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; }
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
+  h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #fff; }
+  h1 span { color: #666; }
+  
+  /* Tabs */
+  .tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 1px solid #222; }
+  .tab { padding: 0.75rem 1.5rem; cursor: pointer; color: #888; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab:hover { color: #ccc; }
+  .tab.active { color: #fff; border-bottom-color: #4f9cf7; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  
+  /* Upload */
+  .drop-zone { border: 2px dashed #333; border-radius: 12px; padding: 3rem; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: #4f9cf7; background: #111; }
+  .drop-zone p { color: #888; margin-top: 0.5rem; }
+  .drop-zone .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  input[type="file"] { display: none; }
+  
+  /* Document list */
+  .doc-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .doc-item { display: flex; justify-content: space-between; align-items: center; background: #111; border: 1px solid #222; border-radius: 8px; padding: 1rem 1.25rem; }
+  .doc-info { flex: 1; }
+  .doc-name { font-weight: 500; color: #fff; }
+  .doc-meta { font-size: 0.8rem; color: #666; margin-top: 0.25rem; }
+  .btn-delete { background: none; border: 1px solid #442222; color: #aa4444; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; }
+  .btn-delete:hover { background: #221111; border-color: #aa4444; }
+  
+  /* Search */
+  .search-box { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .search-box input { flex: 1; background: #111; border: 1px solid #333; border-radius: 8px; padding: 0.75rem 1rem; color: #fff; font-size: 1rem; outline: none; }
+  .search-box input:focus { border-color: #4f9cf7; }
+  .search-box button { background: #4f9cf7; color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 500; }
+  .search-box button:hover { background: #3d8ce0; }
+  .search-results { background: #111; border: 1px solid #222; border-radius: 8px; padding: 1.25rem; white-space: pre-wrap; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; line-height: 1.6; max-height: 60vh; overflow-y: auto; }
+  .search-results:empty::before { content: 'Результаты поиска появятся здесь...'; color: #444; }
+  .status { padding: 0.5rem; text-align: center; color: #666; font-size: 0.85rem; }
+  .empty { text-align: center; color: #444; padding: 3rem 0; }
+  .answer { line-height: 1.6; }
+  .answer p { margin: 0.2rem 0; }
+  .answer ul, .answer ol { margin: 0.2rem 0; padding-left: 1.2rem; }
+  .answer li { margin: 0.05rem 0; }
+  .answer strong { color: #fff; }
+  .answer em { color: #ccc; }
+  .answer h1,.answer h2,.answer h3 { color: #fff; margin: 0.6rem 0 0.2rem; }
+  .answer code { background: #1a1a1a; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.9em; }
+  .answer pre { background: #111; padding: 0.5rem; border-radius: 6px; margin: 0.3rem 0; }
+  .answer blockquote { border-left: 3px solid #444; padding-left: 1rem; color: #999; margin: 0.3rem 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧠 Knowledge Base <span>/ RAG</span></h1>
+  
+  <div class="tabs">
+    <div class="tab active" data-tab="documents">Документы</div>
+    <div class="tab" data-tab="search">Поиск</div>
+  </div>
+
+  <div class="panel active" id="panel-documents">
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">📄</div>
+      <p>Перетащите файл сюда или нажмите для загрузки</p>
+      <p style="font-size:0.75rem; margin-top:0.5rem;">docx, xlsx, pdf, txt, md, csv, json</p>
+    </div>
+    <input type="file" id="fileInput" multiple accept=".docx,.xlsx,.pdf,.txt,.md,.csv,.json">
+    <div class="status" id="uploadStatus"></div>
+    <div style="margin-top:1.5rem;">
+      <div class="doc-list" id="docList"></div>
+      <div class="empty" id="emptyMsg">Нет загруженных документов</div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-search">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Задайте вопрос по документам..." autofocus>
+      <button id="searchBtn">Найти</button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+const API = '';
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+// Tabs
+$$('.tab').forEach(t => t.addEventListener('click', () => {
+  $$('.tab').forEach(x => x.classList.remove('active'));
+  $$('.panel').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  $(`#panel-${t.dataset.tab}`).classList.add('active');
+}));
+
+// Load documents
+async function loadDocs() {
+  const res = await fetch(`${API}/api/documents`);
+  const docs = await res.json();
+  const list = $('#docList');
+  const empty = $('#emptyMsg');
+  list.innerHTML = '';
+  if (!docs.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  docs.forEach(d => {
+    const size = d.size > 1048576 ? (d.size/1048576).toFixed(1)+' MB' : (d.size/1024).toFixed(0)+' KB';
+    const date = d.uploaded_at ? new Date(d.uploaded_at).toLocaleString('ru') : '';
+    list.innerHTML += `<div class="doc-item">
+      <div class="doc-info">
+        <div class="doc-name">${d.name}</div>
+        <div class="doc-meta">${size} · ${d.chunks} чанков · ${date}</div>
+      </div>
+      <button class="btn-delete" onclick="deleteDoc('${d.id}','${d.name}')">Удалить</button>
+    </div>`;
+  });
+}
+
+// Upload
+const dropZone = $('#dropZone');
+const fileInput = $('#fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); uploadFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', e => uploadFiles(e.target.files));
+
+async function uploadFiles(files) {
+  const status = $('#uploadStatus');
+  for (const f of files) {
+    status.textContent = `Загрузка ${f.name}...`;
+    const fd = new FormData();
+    fd.append('file', f);
+    try {
+      const res = await fetch(`${API}/api/documents`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (res.ok) status.textContent = `✓ ${f.name} загружен (${data.chunks} чанков)`;
+      else status.textContent = `✗ ${f.name}: ${data.error}`;
+    } catch(e) { status.textContent = `✗ Ошибка: ${e.message}`; }
+  }
+  fileInput.value = '';
+  loadDocs();
+  setTimeout(() => { if (status.textContent.startsWith('✓')) status.textContent = ''; }, 3000);
+}
+
+// Delete
+async function deleteDoc(id, name) {
+  if (!confirm(`Удалить "${name}" из базы знаний?`)) return;
+  await fetch(`${API}/api/documents/${id}`, { method: 'DELETE' });
+  loadDocs();
+}
+
+// Search
+const searchInput = $('#searchInput');
+const searchBtn = $('#searchBtn');
+const searchResults = $('#searchResults');
+
+async function doSearch() {
+  const q = searchInput.value.trim();
+  if (!q) return;
+  searchResults.textContent = 'Ищу...';
+  try {
+    const res = await fetch(`${API}/api/search`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query: q}) });
+    const data = await res.json();
+    if (data.answer) {
+      searchResults.innerHTML = `<div class="answer">${marked.parse(data.answer)}</div>`
+        + `<details><summary style="cursor:pointer;color:#666;font-size:0.85rem;margin-top:1rem;">Источники</summary><div style="margin-top:0.5rem;font-family:monospace;font-size:0.8rem;color:#888;white-space:pre-wrap;">${data.sources}</div></details>`;
+    } else {
+      searchResults.textContent = data.results || data.error || 'Ничего не найдено';
+    }
+  } catch(e) { searchResults.textContent = `Ошибка: ${e.message}`; }
+}
+
+searchBtn.addEventListener('click', doSearch);
+searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+// Init
+loadDocs();
+</script>
+</body>
+</html>
